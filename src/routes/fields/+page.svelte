@@ -2,18 +2,29 @@
     import { goto } from '$app/navigation';
     
     let fields = [
-        { id: 1, type: 'agriculture', name: 'North Field', size: 12.5, unit: 'ha', crop: 'Wheat', status: 'Growing' },
-        { id: 2, type: 'agriculture', name: 'South Field', size: 8.3, unit: 'ha', crop: 'Corn', status: 'Planted' },
-        { id: 3, type: 'agriculture', name: 'East Meadow', size: 15.0, unit: 'ha', crop: 'Soybeans', status: 'Growing' },
-        { id: 4, type: 'garden', name: 'Home Garden', size: 250, unit: 'm²', crop: 'Tomatoes', status: 'Growing' },
-        { id: 5, type: 'garden', name: 'Greenhouse Plot', size: 180, unit: 'm²', crop: 'Peppers', status: 'Planted' },
-        { id: 6, type: 'agriculture', name: 'West Plot', size: 6.2, unit: 'ha', crop: 'Barley', status: 'Harvested' }
+        { id: 1, type: 'agriculture', name: 'North Field', length: 500, width: 250, unit: 'ha', crop: 'Wheat', status: 'Growing' },
+        { id: 2, type: 'agriculture', name: 'South Field', length: 415, width: 200, unit: 'ha', crop: 'Corn', status: 'Planted' },
+        { id: 3, type: 'agriculture', name: 'East Meadow', length: 600, width: 250, unit: 'ha', crop: 'Soybeans', status: 'Growing' },
+        { id: 4, type: 'garden', name: 'Home Garden', length: 25, width: 10, unit: 'm²', crop: 'Tomatoes', status: 'Growing' },
+        { id: 5, type: 'garden', name: 'Greenhouse Plot', length: 18, width: 10, unit: 'm²', crop: 'Peppers', status: 'Planted' },
+        { id: 6, type: 'agriculture', name: 'West Plot', length: 310, width: 200, unit: 'ha', crop: 'Barley', status: 'Harvested' }
     ];
+    
+    // Calculate area for each field
+    function calculateArea(field) {
+        if (field.type === 'agriculture') {
+            // For agriculture fields, length and width are in meters, convert to hectares
+            return (field.length * field.width) / 10000;
+        } else {
+            // For gardens, length and width are in meters, result in m²
+            return field.length * field.width;
+        }
+    }
     
     $: agricultureFields = fields.filter(f => f.type === 'agriculture');
     $: gardenFields = fields.filter(f => f.type === 'garden');
-    $: totalAgricultureArea = agricultureFields.reduce((sum, f) => sum + f.size, 0);
-    $: totalGardenArea = gardenFields.reduce((sum, f) => sum + f.size, 0);
+    $: totalAgricultureArea = agricultureFields.reduce((sum, f) => sum + calculateArea(f), 0);
+    $: totalGardenArea = gardenFields.reduce((sum, f) => sum + calculateArea(f), 0);
 </script>
 
 <div class="max-w-6xl">
@@ -64,8 +75,12 @@
                         
                         <div class="space-y-2 text-[#555]">
                             <div class="flex justify-between">
-                                <span class="font-semibold">Size:</span>
-                                <span>{field.size} {field.unit}</span>
+                                <span class="font-semibold">Dimensions:</span>
+                                <span>{field.length}m × {field.width}m</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="font-semibold">Area:</span>
+                                <span>{calculateArea(field).toFixed(2)} {field.unit}</span>
                             </div>
                             <div class="flex justify-between">
                                 <span class="font-semibold">Current Crop:</span>
@@ -115,8 +130,12 @@
                         
                         <div class="space-y-2 text-[#555]">
                             <div class="flex justify-between">
-                                <span class="font-semibold">Size:</span>
-                                <span>{field.size} {field.unit}</span>
+                                <span class="font-semibold">Dimensions:</span>
+                                <span>{field.length}m × {field.width}m</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="font-semibold">Area:</span>
+                                <span>{calculateArea(field).toFixed(2)} {field.unit}</span>
                             </div>
                             <div class="flex justify-between">
                                 <span class="font-semibold">Current Crop:</span>
