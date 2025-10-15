@@ -38,6 +38,23 @@
     // Active tab
     let activeTab = 'overview'; // 'overview', 'planner', 'activities'
     
+    // Editable field details
+    let editableLength = 0;
+    let editableWidth = 0;
+    let editableLat = 0;
+    let editableLng = 0;
+    
+    // Initialize editable values when field loads
+    $: if (field) {
+        editableLength = field.length;
+        editableWidth = field.width;
+        editableLat = field.lat;
+        editableLng = field.lng;
+    }
+    
+    // Recalculate area when dimensions change
+    $: editableArea = field ? (field.type === 'agriculture' ? (editableLength * editableWidth / 10000) : (editableLength * editableWidth)) : 0;
+    
     // Mock activity log
     const activities = [
         { date: '2024-05-01', type: 'Fertilization', description: 'Applied organic fertilizer', user: 'John' },
@@ -156,24 +173,24 @@
         // Recalculate number of rows based on intercropping
         if (useIntercropping && intercroppingStrategy === 'alternate_rows') {
             // Need even number of rows for alternating
-            const calculatedRows = Math.floor(field.width / (field.type === 'agriculture' ? 0.75 : 0.5));
+            const calculatedRows = Math.floor(editableWidth / (field.type === 'agriculture' ? 0.75 : 0.5));
             numberOfRows = calculatedRows % 2 === 0 ? calculatedRows : calculatedRows - 1;
         } else {
-            numberOfRows = Math.floor(field.width / (field.type === 'agriculture' ? 0.75 : 0.5));
+            numberOfRows = Math.floor(editableWidth / (field.type === 'agriculture' ? 0.75 : 0.5));
         }
     }
     
     // Initialize with AI recommendations
-    $: if (field) {
-        const aiRec = getAIRecommendations(field.soilType, field.type, field.width);
-        if (!primaryCrop || primaryCrop === 'Wheat') {
-            primaryCrop = aiRec.primaryCrop;
-            useIntercropping = aiRec.useIntercropping;
-            secondaryCrop = aiRec.secondaryCrop;
-            intercroppingStrategy = aiRec.intercroppingStrategy;
-            numberOfRows = aiRec.numberOfRows;
-            spacingBetweenCrops = aiRec.spacingBetweenCrops;
-        }
+    let initialized = false;
+    $: if (field && !initialized) {
+        const aiRec = getAIRecommendations(field.soilType, field.type, editableWidth);
+        primaryCrop = aiRec.primaryCrop;
+        useIntercropping = aiRec.useIntercropping;
+        secondaryCrop = aiRec.secondaryCrop;
+        intercroppingStrategy = aiRec.intercroppingStrategy;
+        numberOfRows = aiRec.numberOfRows;
+        spacingBetweenCrops = aiRec.spacingBetweenCrops;
+        initialized = true;
     }
     
     // Calculate number of plants
@@ -181,7 +198,7 @@
     let totalSecondaryPlants = 0;
     
     $: if (field) {
-        const fieldLength = field.length;
+        const fieldLength = editableLength;
         const plantsPerRow = Math.floor(fieldLength / spacingBetweenCrops);
         
         if (useIntercropping && intercroppingStrategy === 'alternate_rows') {
@@ -521,8 +538,8 @@
                 <h3 class="text-2xl font-bold pencil-text text-[#2e7d32] mb-4">📍 Field Location</h3>
                 <div class="h-[400px]">
                     <GoogleMap 
-                        latitude={field.lat} 
-                        longitude={field.lng} 
+                        latitude={editableLat} 
+                        longitude={editableLng} 
                         zoom={15}
                         fieldName={field.name}
                     />
@@ -534,11 +551,11 @@
                     </div>
                     <div class="flex items-center gap-2">
                         <span class="font-semibold text-[#555] text-sm">Coordinates:</span>
-                        <span class="text-[#333] text-sm">{field.lat.toFixed(4)}°N, {field.lng.toFixed(4)}°E</span>
+                        <span class="text-[#333] text-sm">{editableLat.toFixed(4)}°N, {editableLng.toFixed(4)}°E</span>
                     </div>
                     <div class="mt-3">
                         <a 
-                            href="https://www.google.com/maps/search/?api=1&query={field.lat},{field.lng}"
+                            href="https://www.google.com/maps/search/?api=1&query={editableLat},{editableLng}"
                             target="_blank"
                             rel="noopener noreferrer"
                             class="sketch-button bg-[#e8f5e9] text-[#2e7d32] px-4 py-2 text-sm inline-flex items-center gap-2 hover:bg-[#c8e6c9]"
@@ -551,17 +568,55 @@
 
             <!-- Field Details -->
             <div class="space-y-6">
-                <!-- Size -->
+                <!-- Field Details -->
                 <div class="sketch-box p-5 bg-white">
-                    <h4 class="text-lg font-bold text-[#2e7d32] mb-3">📏 Field Size</h4>
-                    <div class="space-y-2">
-                        <div class="flex justify-between">
-                            <span class="text-sm text-[#555]">Dimensions:</span>
-                            <span class="font-bold text-[#333]">{field.length}m × {field.width}m</span>
+                    <h4 class="text-lg font-bold text-[#2e7d32] mb-4">📏 Field Details</h4>
+                    <div class="space-y-3">
+                        <div>
+                            <label class="block text-xs text-[#555] mb-1">Length (m)</label>
+                            <input 
+                                type="number" 
+                                bind:value={editableLength}
+                                class="sketch-box w-full px-3 py-2 bg-[#faf9f6] text-[#333] font-semibold focus:outline-none focus:ring-2 focus:ring-[#a5d6a7]"
+                                placeholder="Length in meters"
+                                min="1"
+                            />
                         </div>
-                        <div class="flex justify-between">
+                        <div>
+                            <label class="block text-xs text-[#555] mb-1">Width (m)</label>
+                            <input 
+                                type="number" 
+                                bind:value={editableWidth}
+                                class="sketch-box w-full px-3 py-2 bg-[#faf9f6] text-[#333] font-semibold focus:outline-none focus:ring-2 focus:ring-[#a5d6a7]"
+                                placeholder="Width in meters"
+                                min="1"
+                            />
+                        </div>
+                        <div class="pt-2 border-t border-[#333] opacity-20"></div>
+                        <div class="flex justify-between items-center">
                             <span class="text-sm text-[#555]">Total Area:</span>
-                            <span class="font-bold text-[#2e7d32] text-xl">{calculatedArea.toFixed(2)} {field.unit}</span>
+                            <span class="font-bold text-[#2e7d32] text-xl">{editableArea.toFixed(2)} {field.unit}</span>
+                        </div>
+                        <div class="pt-2 border-t border-[#333] opacity-20"></div>
+                        <div>
+                            <label class="block text-xs text-[#555] mb-1">Latitude</label>
+                            <input 
+                                type="number" 
+                                bind:value={editableLat}
+                                step="0.0001"
+                                class="sketch-box w-full px-3 py-2 bg-[#faf9f6] text-[#333] font-semibold focus:outline-none focus:ring-2 focus:ring-[#a5d6a7]"
+                                placeholder="Latitude"
+                            />
+                        </div>
+                        <div>
+                            <label class="block text-xs text-[#555] mb-1">Longitude</label>
+                            <input 
+                                type="number" 
+                                bind:value={editableLng}
+                                step="0.0001"
+                                class="sketch-box w-full px-3 py-2 bg-[#faf9f6] text-[#333] font-semibold focus:outline-none focus:ring-2 focus:ring-[#a5d6a7]"
+                                placeholder="Longitude"
+                            />
                         </div>
                     </div>
                 </div>
@@ -842,7 +897,7 @@
 
                 <!-- AI Recommendations -->
                 {#if field}
-                {@const aiRec = getAIRecommendations(field.soilType, field.type, field.width)}
+                {@const aiRec = getAIRecommendations(field.soilType, field.type, editableWidth)}
                 {@const companionInfo = getCompanionCrop(primaryCrop)}
                 <div class="sketch-box p-5 bg-[#fff8e1]">
                     <div class="flex items-center gap-2 mb-3">
@@ -970,7 +1025,7 @@
                                             {#if useIntercropping && intercroppingStrategy === 'alternate_rows'}
                                                 💡 Even number recommended for alternating
                                             {:else}
-                                                💡 Based on {field.width}m width
+                                                💡 Based on {editableWidth}m width
                                             {/if}
                                         </p>
                                     </div>
@@ -1023,8 +1078,8 @@
                                 </div>
                                 <div class="pt-3 border-t-2 border-[#2e7d32] opacity-20"></div>
                                 <div class="mt-3 text-xs text-[#666]">
-                                    <p><strong>Field dimensions:</strong> {field.length}m × {field.width}m</p>
-                                    <p><strong>Plants per row:</strong> {Math.floor(field.length / spacingBetweenCrops)}</p>
+                                    <p><strong>Field dimensions:</strong> {editableLength}m × {editableWidth}m</p>
+                                    <p><strong>Plants per row:</strong> {Math.floor(editableLength / spacingBetweenCrops)}</p>
                                     {#if useIntercropping && intercroppingStrategy === 'alternate_rows'}
                                     <p><strong>Strategy:</strong> {Math.ceil(numberOfRows / 2)} rows of {primaryCrop}, {Math.floor(numberOfRows / 2)} rows of {secondaryCrop}</p>
                                     {:else if useIntercropping && intercroppingStrategy === 'same_row'}

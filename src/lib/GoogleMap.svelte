@@ -24,6 +24,13 @@
         }
     });
     
+    // Update map position when latitude or longitude changes
+    $: if (map && marker && (latitude || longitude)) {
+        const newPosition = { lat: latitude, lng: longitude };
+        map.setCenter(newPosition);
+        marker.setPosition(newPosition);
+    }
+    
     function initMap() {
         if (!mapContainer) return;
         
