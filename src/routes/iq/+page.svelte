@@ -1,29 +1,64 @@
 <script>
+    import { sendPromptToGemini } from '$lib/gemini';
+    import { saveChatHistory } from '$lib/chatHistory';
+    
     let messages = [
-        { role: 'assistant', content: 'Hello! I\'m DemetriA IQ, your agricultural AI assistant. Ask me anything about farming, crops, soil management, pest control, or any agricultural topic!' }
+        { role: 'assistant', content: 'Hello! I\'m DemetriA IQ, your agricultural AI assistant powered by Gemini. Ask me anything about farming, crops, soil management, pest control, or any agricultural topic!' }
     ];
     let userInput = '';
     let isLoading = false;
+    let error = '';
+    let currentSessionId = null; // Current chat session ID
+    let isSaving = false;
     
-    // Mock AI responses - in real app this would call an AI API
-    const mockResponses = {
-        'wheat': 'Wheat is best planted in fall or early spring depending on your climate. It requires well-drained soil with a pH of 6.0-7.0. Make sure to rotate crops to prevent disease buildup.',
-        'fertilizer': 'For optimal results, use nitrogen-rich fertilizers during the vegetative stage. Consider organic options like compost or manure. Soil testing will help determine exact nutrient needs.',
-        'pest': 'Integrated Pest Management (IPM) is recommended. Start with monitoring, use natural predators when possible, and only resort to pesticides when necessary. Regular field inspections are key.',
-        'irrigation': 'Drip irrigation is most water-efficient. Water early morning or evening to reduce evaporation. Monitor soil moisture levels and adjust based on weather conditions.',
-        'soil': 'Healthy soil is the foundation of good farming. Test pH levels regularly, add organic matter, practice crop rotation, and avoid over-tilling to maintain soil structure.',
-        'default': 'That\'s a great question! Based on agricultural best practices, I recommend consulting with local agricultural extension services for region-specific advice. Would you like me to provide more general information on this topic?'
-    };
+    // Each page load starts a fresh chat
+    // All chats are saved to Firebase and accessible from /iq/history
     
-    function getAIResponse(question) {
-        const lowerQuestion = question.toLowerCase();
-        for (const [key, response] of Object.entries(mockResponses)) {
-            if (lowerQuestion.includes(key)) {
-                return response;
-            }
+    // Save chat history to Firebase
+    async function saveHistory() {
+        if (isSaving) return; // Prevent concurrent saves
+        
+        // Only save if there are actual user messages (not just the welcome message)
+        const hasUserMessages = messages.some(m => m.role === 'user');
+        if (!hasUserMessages) {
+            return;
         }
-        return mockResponses.default;
+        
+        try {
+            isSaving = true;
+            currentSessionId = await saveChatHistory(messages, currentSessionId);
+        } catch (e) {
+            console.error('Failed to save chat history:', e);
+            error = 'Failed to save chat history';
+        } finally {
+            isSaving = false;
+        }
     }
+    
+    // Start a new chat (saves current one first)
+    async function startNewChat() {
+        if (confirm('Start a new chat? Your current conversation will be saved to history.')) {
+            // Save current chat if it has messages
+            await saveHistory();
+            
+            // Reset to fresh chat
+            messages = [
+                { role: 'assistant', content: 'Hello! I\'m DemetriA IQ, your agricultural AI assistant powered by Gemini. Ask me anything about farming, crops, soil management, pest control, or any agricultural topic!' }
+            ];
+            currentSessionId = null;
+        }
+    }
+    
+    // System prompt to guide Gemini's responses
+    const systemContext = `You are DemetriA IQ, an expert agricultural AI assistant. You provide practical, science-based advice on:
+- Crop cultivation and management
+- Soil health and fertilization
+- Pest and disease control
+- Irrigation and water management
+- Sustainable farming practices
+- Agricultural technology
+
+Provide clear, actionable advice. Keep responses concise (2-4 paragraphs) unless asked for more detail. Use a friendly, professional tone.`;
     
     async function sendMessage() {
         if (!userInput.trim() || isLoading) return;
@@ -33,22 +68,44 @@
         const question = userInput;
         userInput = '';
         isLoading = true;
+        error = '';
         
-        // Simulate AI thinking delay
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        
-        // Add AI response
-        const response = getAIResponse(question);
-        messages = [...messages, { role: 'assistant', content: response }];
-        isLoading = false;
-        
-        // Scroll to bottom
-        setTimeout(() => {
-            const chatContainer = document.getElementById('chat-container');
-            if (chatContainer) {
-                chatContainer.scrollTop = chatContainer.scrollHeight;
-            }
-        }, 100);
+        try {
+            // Build conversation context for Gemini
+            const conversationHistory = messages
+                .slice(-6) // Last 3 exchanges to keep context manageable
+                .map(m => `${m.role === 'user' ? 'User' : 'Assistant'}: ${m.content}`)
+                .join('\n\n');
+            
+            const fullPrompt = `${systemContext}\n\nConversation history:\n${conversationHistory}\n\nUser: ${question}\n\nAssistant:`;
+            
+            // Call Gemini API
+            const response = await sendPromptToGemini(fullPrompt);
+            
+            // Add AI response
+            messages = [...messages, { role: 'assistant', content: response }];
+            await saveHistory(); // Save after successful response
+        } catch (err) {
+            console.error('Error getting AI response:', err);
+            error = err instanceof Error ? err.message : 'Failed to get response';
+            
+            // Add error message to chat
+            messages = [...messages, { 
+                role: 'assistant', 
+                content: '❌ Sorry, I encountered an error. Please make sure the Gemini API is configured correctly and try again.' 
+            }];
+            await saveHistory(); // Save even on error
+        } finally {
+            isLoading = false;
+            
+            // Scroll to bottom
+            setTimeout(() => {
+                const chatContainer = document.getElementById('chat-container');
+                if (chatContainer) {
+                    chatContainer.scrollTop = chatContainer.scrollHeight;
+                }
+            }, 100);
+        }
     }
     
     function handleKeyPress(event) {
@@ -77,12 +134,63 @@
     <div class="mb-6 flex justify-between items-start">
         <div>
             <h2 class="text-4xl font-bold pencil-text text-[#2e7d32] sketch-underline inline-block">DemetriA IQ</h2>
-            <p class="text-lg text-[#666] mt-2">Your AI-powered agricultural assistant</p>
+            <p class="text-lg text-[#666] mt-2">
+                Your AI-powered agricultural assistant
+                {#if isSaving}
+                    <span class="text-sm text-[#2e7d32] ml-2">💾 Saving...</span>
+                {/if}
+            </p>
         </div>
-        <a href="/iq/history" class="sketch-button bg-[#fff8e1] text-[#f57c00] px-5 py-3 font-bold hover:bg-[#ffecb3]">
-            📜 View History
-        </a>
+        <div class="flex gap-2">
+            <button 
+                on:click={startNewChat}
+                class="sketch-button bg-[#e3f2fd] text-[#1565c0] px-5 py-3 font-bold hover:bg-[#bbdefb]"
+                title="Start a new chat conversation"
+            >
+                ✨ New Chat
+            </button>
+            <a href="/iq/history" class="sketch-button bg-[#fff8e1] text-[#f57c00] px-5 py-3 font-bold hover:bg-[#ffecb3]">
+                📜 View History
+            </a>
+        </div>
     </div>
+
+    <!-- Error notification -->
+    {#if error}
+        <div class="mb-4 sketch-box p-4 bg-[#ffebee] border-[#c62828]">
+            <div class="flex items-center gap-2">
+                <span class="text-xl">⚠️</span>
+                <div class="flex-1">
+                    <p class="font-bold text-[#c62828]">Error</p>
+                    <p class="text-sm text-[#c62828]">{error}</p>
+                </div>
+                <button 
+                    on:click={() => error = ''}
+                    class="text-[#c62828] hover:text-[#b71c1c] font-bold"
+                >
+                    ✕
+                </button>
+            </div>
+        </div>
+    {/if}
+
+    <!-- Suggested Questions (show when chat is empty) -->
+    {#if messages.length === 1}
+        <div class="mb-6 sketch-box p-6 bg-[#e8f5e9]">
+            <h3 class="text-lg font-bold text-[#2e7d32] mb-3">💡 Try asking:</h3>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {#each suggestedQuestions as question}
+                    <button
+                        on:click={() => askSuggested(question)}
+                        class="sketch-button bg-white text-[#2e7d32] px-4 py-3 text-left text-sm hover:bg-[#c8e6c9] transition-colors"
+                        disabled={isLoading}
+                    >
+                        {question}
+                    </button>
+                {/each}
+            </div>
+        </div>
+    {/if}
 
     <!-- Chat Area -->
     <div>
