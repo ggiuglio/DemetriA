@@ -28,9 +28,11 @@
 		"vite": "^5.4.11"
 	},
 	"dependencies": {
+		"@google-cloud/functions-framework": "^4.0.1",
 		"@google/generative-ai": "^0.24.1",
 		"@sveltejs/adapter-static": "^3.0.9",
 		"firebase": "^12.5.0",
+		"firebase-functions": "^7.0.1",
 		"svelte-preprocess": "^6.0.3"
 	}
 }
