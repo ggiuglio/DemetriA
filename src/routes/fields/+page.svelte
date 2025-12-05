@@ -1,17 +1,90 @@
-<script>
+<script lang="ts">
     import { goto } from '$app/navigation';
+    import { onMount, onDestroy } from 'svelte';
+    import { fieldsService, type Field } from '$lib/services/fieldsService';
     
-    let fields = [
-        { id: 1, type: 'agriculture', name: 'North Field', length: 500, width: 250, unit: 'ha', crop: 'Wheat', status: 'Growing' },
-        { id: 2, type: 'agriculture', name: 'South Field', length: 415, width: 200, unit: 'ha', crop: 'Corn', status: 'Planted' },
-        { id: 3, type: 'agriculture', name: 'East Meadow', length: 600, width: 250, unit: 'ha', crop: 'Soybeans', status: 'Growing' },
-        { id: 4, type: 'garden', name: 'Home Garden', length: 25, width: 10, unit: 'm²', crop: 'Tomatoes', status: 'Growing' },
-        { id: 5, type: 'garden', name: 'Greenhouse Plot', length: 18, width: 10, unit: 'm²', crop: 'Peppers', status: 'Planted' },
-        { id: 6, type: 'agriculture', name: 'West Plot', length: 310, width: 200, unit: 'ha', crop: 'Barley', status: 'Harvested' }
-    ];
+    let fields: Field[] = [];
+    let loading = true;
+    let unsubscribe: (() => void) | null = null;
+    let showModal = false;
+    let saving = false;
+    
+    // Form data
+    let newField = {
+        type: 'agriculture' as 'agriculture' | 'garden',
+        name: '',
+        length: 0,
+        width: 0,
+        unit: 'ha' as 'ha' | 'm²',
+        crop: 'Not specified',
+        status: 'Empty'
+    };
+    
+    onMount(() => {
+        // Subscribe to real-time Firestore updates
+        unsubscribe = fieldsService.subscribeToFields((updatedFields) => {
+            fields = updatedFields;
+            loading = false;
+        });
+    });
+    
+    onDestroy(() => {
+        if (unsubscribe) {
+            unsubscribe();
+        }
+    });
+    
+    function openModal() {
+        showModal = true;
+        // Reset form
+        newField = {
+            type: 'agriculture',
+            name: '',
+            length: 0,
+            width: 0,
+            unit: 'ha',
+            crop: 'Not specified',
+            status: 'Empty'
+        };
+    }
+    
+    function closeModal() {
+        showModal = false;
+    }
+    
+    async function createField() {
+        if (!newField.name || newField.length <= 0 || newField.width <= 0) {
+            alert('Please fill in all required fields');
+            return;
+        }
+        
+        saving = true;
+        try {
+            await fieldsService.createField(newField);
+            closeModal();
+        } catch (error) {
+            console.error('Error creating field:', error);
+            alert('Failed to create field');
+        } finally {
+            saving = false;
+        }
+    }
+    
+    async function deleteField(fieldId: string, fieldName: string) {
+        if (!confirm(`Are you sure you want to delete "${fieldName}"?`)) {
+            return;
+        }
+        
+        try {
+            await fieldsService.deleteField(fieldId);
+        } catch (error) {
+            console.error('Error deleting field:', error);
+            alert('Failed to delete field');
+        }
+    }
     
     // Calculate area for each field
-    function calculateArea(field) {
+    function calculateArea(field: Field) {
         if (field.type === 'agriculture') {
             // For agriculture fields, length and width are in meters, convert to hectares
             return (field.length * field.width) / 10000;
@@ -30,7 +103,10 @@
 <div class="max-w-6xl">
     <div class="flex justify-between items-center mb-6">
         <h2 class="text-4xl font-bold pencil-text text-[#2e7d32] sketch-underline inline-block">My Fields</h2>
-        <button class="sketch-button bg-[#a5d6a7] text-[#1b5e20] px-6 py-3 font-bold hover:bg-[#81c784]">
+        <button 
+            on:click={openModal}
+            class="sketch-button bg-[#a5d6a7] text-[#1b5e20] px-6 py-3 font-bold hover:bg-[#81c784]"
+        >
             + Add New Field
         </button>
     </div>
@@ -97,8 +173,11 @@
                             >
                                 View Details
                             </button>
-                            <button class="sketch-button bg-white text-[#333] px-4 py-2 text-sm hover:bg-[#f5f5f5]">
-                                Edit
+                            <button 
+                                on:click={() => deleteField(field.id, field.name)}
+                                class="sketch-button bg-[#ffebee] text-[#c62828] px-4 py-2 text-sm hover:bg-[#ffcdd2]"
+                            >
+                                Delete
                             </button>
                         </div>
                     </div>
@@ -152,8 +231,11 @@
                             >
                                 View Details
                             </button>
-                            <button class="sketch-button bg-white text-[#333] px-4 py-2 text-sm hover:bg-[#f5f5f5]">
-                                Edit
+                            <button 
+                                on:click={() => deleteField(field.id, field.name)}
+                                class="sketch-button bg-[#ffebee] text-[#c62828] px-4 py-2 text-sm hover:bg-[#ffcdd2]"
+                            >
+                                Delete
                             </button>
                         </div>
                     </div>
@@ -162,3 +244,86 @@
         </div>
     {/if}
 </div>
+
+<!-- Modal for creating new field -->
+{#if showModal}
+    <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" on:click={closeModal}>
+        <div class="bg-white rounded-lg p-8 max-w-2xl w-full mx-4 sketch-box" on:click|stopPropagation>
+            <h3 class="text-3xl font-bold pencil-text text-[#2e7d32] mb-6">Add New Field</h3>
+            
+            <form on:submit|preventDefault={createField} class="space-y-4">
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-semibold text-[#555] mb-2">Field Type</label>
+                        <select bind:value={newField.type} class="w-full p-2 border-2 border-[#333] rounded">
+                            <option value="agriculture">Agriculture</option>
+                            <option value="garden">Garden</option>
+                        </select>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-semibold text-[#555] mb-2">Unit</label>
+                        <select bind:value={newField.unit} class="w-full p-2 border-2 border-[#333] rounded">
+                            <option value="ha">Hectares (ha)</option>
+                            <option value="m²">Square Meters (m²)</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-semibold text-[#555] mb-2">Field Name *</label>
+                    <input 
+                        type="text" 
+                        bind:value={newField.name}
+                        placeholder="e.g., North Field"
+                        class="w-full p-2 border-2 border-[#333] rounded"
+                        required
+                    />
+                </div>
+                
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-semibold text-[#555] mb-2">Length (meters) *</label>
+                        <input 
+                            type="number" 
+                            bind:value={newField.length}
+                            min="1"
+                            placeholder="500"
+                            class="w-full p-2 border-2 border-[#333] rounded"
+                            required
+                        />
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-semibold text-[#555] mb-2">Width (meters) *</label>
+                        <input 
+                            type="number" 
+                            bind:value={newField.width}
+                            min="1"
+                            placeholder="250"
+                            class="w-full p-2 border-2 border-[#333] rounded"
+                            required
+                        />
+                    </div>
+                </div>
+                
+                <div class="flex gap-4 mt-6">
+                    <button 
+                        type="submit"
+                        disabled={saving}
+                        class="sketch-button bg-[#a5d6a7] text-[#1b5e20] px-6 py-3 font-bold hover:bg-[#81c784] flex-1 disabled:opacity-50"
+                    >
+                        {saving ? 'Creating...' : 'Create Field'}
+                    </button>
+                    <button 
+                        type="button"
+                        on:click={closeModal}
+                        class="sketch-button bg-white text-[#333] px-6 py-3 hover:bg-[#f5f5f5]"
+                    >
+                        Cancel
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+{/if}
