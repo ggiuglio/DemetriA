@@ -44,6 +44,8 @@
     // Edit mode
     let isEditMode = false;
     let saving = false;
+    let isSoilEditMode = false;
+    let savingSoil = false;
     
     // Editable field details
     let editableLength = 0;
@@ -54,6 +56,13 @@
     let editableStatus = '';
     let editableCrop = '';
     let editableNotes = '';
+    let editableSoilType = '';
+    let editablePH = 0;
+    let editableStoniness = '';
+    let editableDrainage = '';
+    let editableIrrigation = '';
+    let editablePlantedDate = '';
+    let editableExpectedHarvest = '';
     
     // Store original values for cancel
     let originalValues = {
@@ -64,7 +73,14 @@
         name: '',
         status: '',
         crop: '',
-        notes: ''
+        notes: '',
+        soilType: '',
+        pH: 0,
+        stoniness: '',
+        drainage: '',
+        irrigation: '',
+        plantedDate: '',
+        expectedHarvest: ''
     };
     
     // Initialize editable values when field loads
@@ -77,6 +93,13 @@
         editableStatus = field.status || '';
         editableCrop = field.crop || '';
         editableNotes = field.notes || '';
+        editableSoilType = field.soilType || '';
+        editablePH = field.pH || 0;
+        editableStoniness = field.stoniness || '';
+        editableDrainage = field.drainage || '';
+        editableIrrigation = field.irrigation || '';
+        editablePlantedDate = field.plantedDate || '';
+        editableExpectedHarvest = field.expectedHarvest || '';
         
         // Store original values
         originalValues = {
@@ -87,12 +110,23 @@
             name: field.name || '',
             status: field.status || '',
             crop: field.crop || '',
-            notes: field.notes || ''
+            notes: field.notes || '',
+            soilType: field.soilType || '',
+            pH: field.pH || 0,
+            stoniness: field.stoniness || '',
+            drainage: field.drainage || '',
+            irrigation: field.irrigation || '',
+            plantedDate: field.plantedDate || '',
+            expectedHarvest: field.expectedHarvest || ''
         };
     }
     
     function enterEditMode() {
         isEditMode = true;
+    }
+    
+    function enterSoilEditMode() {
+        isSoilEditMode = true;
     }
     
     function cancelEdit() {
@@ -105,7 +139,19 @@
         editableStatus = originalValues.status;
         editableCrop = originalValues.crop;
         editableNotes = originalValues.notes;
+        editablePlantedDate = originalValues.plantedDate;
+        editableExpectedHarvest = originalValues.expectedHarvest;
         isEditMode = false;
+    }
+    
+    function cancelSoilEdit() {
+        // Revert soil values
+        editableSoilType = originalValues.soilType;
+        editablePH = originalValues.pH;
+        editableStoniness = originalValues.stoniness;
+        editableDrainage = originalValues.drainage;
+        editableIrrigation = originalValues.irrigation;
+        isSoilEditMode = false;
     }
     
     async function saveChanges() {
@@ -113,15 +159,20 @@
         
         saving = true;
         try {
-            // Only update field size and position
             const updates: any = {
                 length: editableLength,
-                width: editableWidth
+                width: editableWidth,
+                name: editableName,
+                status: editableStatus,
+                crop: editableCrop,
+                notes: editableNotes
             };
             
             // Only include lat/lng if they have values
             if (editableLat) updates.lat = editableLat;
             if (editableLng) updates.lng = editableLng;
+            if (editablePlantedDate) updates.plantedDate = editablePlantedDate;
+            if (editableExpectedHarvest) updates.expectedHarvest = editableExpectedHarvest;
             
             await fieldsService.updateField(field.id, updates);
             isEditMode = false;
@@ -129,6 +180,28 @@
             console.error('Error saving field:', error);
         } finally {
             saving = false;
+        }
+    }
+    
+    async function saveSoilChanges() {
+        if (!field) return;
+        
+        savingSoil = true;
+        try {
+            const updates: any = {
+                soilType: editableSoilType,
+                pH: editablePH,
+                stoniness: editableStoniness,
+                drainage: editableDrainage,
+                irrigation: editableIrrigation
+            };
+            
+            await fieldsService.updateField(field.id, updates);
+            isSoilEditMode = false;
+        } catch (error) {
+            console.error('Error saving soil details:', error);
+        } finally {
+            savingSoil = false;
         }
     }
     
@@ -374,27 +447,132 @@
 
                 <!-- Soil Details -->
                 <div class="sketch-box p-5 bg-[#fff8e1]">
-                    <h4 class="text-lg font-bold text-[#f57c00] mb-3">🌱 Soil Details</h4>
-                    <div class="space-y-2">
-                        <div class="flex justify-between">
-                            <span class="text-sm text-[#555]">Soil Type:</span>
-                            <span class="font-bold text-[#333]">{field.soilType}</span>
+                    <div class="flex justify-between items-center mb-4">
+                        <h4 class="text-lg font-bold text-[#f57c00]">🌱 Soil Details</h4>
+                        <div class="flex gap-2">
+                            {#if isSoilEditMode}
+                                <button 
+                                    on:click={saveSoilChanges}
+                                    disabled={savingSoil}
+                                    class="sketch-button bg-[#a5d6a7] text-[#1b5e20] px-3 py-1 text-sm font-semibold hover:bg-[#81c784] disabled:opacity-50"
+                                >
+                                    {savingSoil ? '💾 Saving...' : '💾 Save'}
+                                </button>
+                                <button 
+                                    on:click={cancelSoilEdit}
+                                    disabled={savingSoil}
+                                    class="sketch-button bg-[#ffebee] text-[#c62828] px-3 py-1 text-sm font-semibold hover:bg-[#ffcdd2] disabled:opacity-50"
+                                >
+                                    Cancel
+                                </button>
+                            {:else}
+                                <button 
+                                    on:click={enterSoilEditMode}
+                                    class="sketch-button bg-[#fff8e1] text-[#333] px-3 py-1 text-sm font-semibold hover:bg-[#ffecb3]"
+                                >
+                                    ✏️ Edit
+                                </button>
+                            {/if}
                         </div>
-                        <div class="flex justify-between">
-                            <span class="text-sm text-[#555]">pH Level:</span>
-                            <span class="font-bold text-[#333]">{field.pH} 
-                                <span class="text-xs text-[#666]">
-                                    ({#if field.pH < 6.0}Acidic{:else if field.pH > 7.5}Alkaline{:else}Neutral{/if})
-                                </span>
-                            </span>
+                    </div>
+                    <div class="space-y-3">
+                        <div>
+                            <label class="block text-xs text-[#555] mb-1">Soil Type</label>
+                            {#if isSoilEditMode}
+                                <select 
+                                    bind:value={editableSoilType}
+                                    class="sketch-box w-full px-3 py-2 bg-white text-[#333] font-semibold focus:outline-none focus:ring-2 focus:ring-[#f57c00]"
+                                >
+                                    <option value="Clay">Clay</option>
+                                    <option value="Sandy">Sandy</option>
+                                    <option value="Loamy">Loamy</option>
+                                    <option value="Silty">Silty</option>
+                                    <option value="Peaty">Peaty</option>
+                                    <option value="Chalky">Chalky</option>
+                                </select>
+                            {:else}
+                                <div class="px-3 py-2">
+                                    <span class="font-bold text-[#333]">{editableSoilType || 'Not set'}</span>
+                                </div>
+                            {/if}
                         </div>
-                        <div class="flex justify-between">
-                            <span class="text-sm text-[#555]">Stoniness:</span>
-                            <span class="font-bold text-[#333]">{field.stoniness}</span>
+                        <div>
+                            <label class="block text-xs text-[#555] mb-1">pH Level</label>
+                            {#if isSoilEditMode}
+                                <input 
+                                    type="number" 
+                                    bind:value={editablePH}
+                                    step="0.1"
+                                    min="0"
+                                    max="14"
+                                    class="sketch-box w-full px-3 py-2 bg-white text-[#333] font-semibold focus:outline-none focus:ring-2 focus:ring-[#f57c00]"
+                                    placeholder="pH (0-14)"
+                                />
+                            {:else}
+                                <div class="px-3 py-2">
+                                    <span class="font-bold text-[#333]">{editablePH || 'Not set'}</span>
+                                    {#if editablePH}
+                                        <span class="text-xs text-[#666] ml-2">
+                                            ({#if editablePH < 6.0}Acidic{:else if editablePH > 7.5}Alkaline{:else}Neutral{/if})
+                                        </span>
+                                    {/if}
+                                </div>
+                            {/if}
                         </div>
-                        <div class="flex justify-between">
-                            <span class="text-sm text-[#555]">Drainage:</span>
-                            <span class="font-bold text-[#333]">{field.drainage}</span>
+                        <div>
+                            <label class="block text-xs text-[#555] mb-1">Stoniness</label>
+                            {#if isSoilEditMode}
+                                <select 
+                                    bind:value={editableStoniness}
+                                    class="sketch-box w-full px-3 py-2 bg-white text-[#333] font-semibold focus:outline-none focus:ring-2 focus:ring-[#f57c00]"
+                                >
+                                    <option value="None">None</option>
+                                    <option value="Low">Low</option>
+                                    <option value="Medium">Medium</option>
+                                    <option value="High">High</option>
+                                </select>
+                            {:else}
+                                <div class="px-3 py-2">
+                                    <span class="font-bold text-[#333]">{editableStoniness || 'Not set'}</span>
+                                </div>
+                            {/if}
+                        </div>
+                        <div>
+                            <label class="block text-xs text-[#555] mb-1">Drainage</label>
+                            {#if isSoilEditMode}
+                                <select 
+                                    bind:value={editableDrainage}
+                                    class="sketch-box w-full px-3 py-2 bg-white text-[#333] font-semibold focus:outline-none focus:ring-2 focus:ring-[#f57c00]"
+                                >
+                                    <option value="Poor">Poor</option>
+                                    <option value="Moderate">Moderate</option>
+                                    <option value="Good">Good</option>
+                                    <option value="Excellent">Excellent</option>
+                                </select>
+                            {:else}
+                                <div class="px-3 py-2">
+                                    <span class="font-bold text-[#333]">{editableDrainage || 'Not set'}</span>
+                                </div>
+                            {/if}
+                        </div>
+                        <div>
+                            <label class="block text-xs text-[#555] mb-1">Irrigation</label>
+                            {#if isSoilEditMode}
+                                <select 
+                                    bind:value={editableIrrigation}
+                                    class="sketch-box w-full px-3 py-2 bg-white text-[#333] font-semibold focus:outline-none focus:ring-2 focus:ring-[#f57c00]"
+                                >
+                                    <option value="None">None</option>
+                                    <option value="Manual">Manual</option>
+                                    <option value="Drip">Drip</option>
+                                    <option value="Sprinkler">Sprinkler</option>
+                                    <option value="Flood">Flood</option>
+                                </select>
+                            {:else}
+                                <div class="px-3 py-2">
+                                    <span class="font-bold text-[#333]">{editableIrrigation || 'Not set'}</span>
+                                </div>
+                            {/if}
                         </div>
                     </div>
                 </div>
