@@ -1,5 +1,6 @@
 <script>
     import { onMount } from 'svelte';
+    import { env } from '$env/dynamic/public';
     
     export let latitude = 0;
     export let longitude = 0;
@@ -14,7 +15,8 @@
         // Load Google Maps script
         if (!window.google) {
             const script = document.createElement('script');
-            script.src = `https://maps.googleapis.com/maps/api/js?key=AIzaSyBpFtdVVwt5e3X8yvjybvcCdyAg3c6tUtg`;
+            const apiKey = env.PUBLIC_GOOGLE_MAPS_API_KEY || import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
+            script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}`;
             script.async = true;
             script.defer = true;
             script.onload = initMap;

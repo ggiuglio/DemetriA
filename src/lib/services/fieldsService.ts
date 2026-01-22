@@ -32,6 +32,11 @@ export interface Field {
 	lat?: number;
 	lng?: number;
 	address?: string;
+	street?: string;
+	city?: string;
+	state?: string;
+	postalCode?: string;
+	country?: string;
 }
 
 const FIELDS_COLLECTION = 'fields';
